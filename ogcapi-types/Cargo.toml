@@ -23,10 +23,13 @@ styles = []
 tiles = ["common"]
 coverages = []
 movingfeatures = ["common", "features"]
+# OGC Features and Geometries JSON (JSON-FG) types, re-exported as `ogcapi_types::jsonfg`.
+json-fg = ["features", "dep:jsonfg"]
 
 [dependencies]
 chrono = { version = "0.4.44", features = ["serde"] }
 geojson = { workspace = true }
+jsonfg = { workspace = true, optional = true, features = ["geojson"] }
 log = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
