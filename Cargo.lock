@@ -2205,6 +2205,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonfg"
+version = "0.1.0"
+source = "git+https://github.com/360-geo/jsonfg?rev=82126d83268950121837aeae8dafc27e2f3d89d3#82126d83268950121837aeae8dafc27e2f3d89d3"
+dependencies = [
+ "geojson",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2701,6 +2711,7 @@ version = "0.3.0"
 dependencies = [
  "chrono",
  "geojson",
+ "jsonfg",
  "log",
  "serde",
  "serde_json",
@@ -3492,6 +3503,7 @@ version = "1.0.149"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
 dependencies = [
+ "indexmap 2.13.1",
  "itoa",
  "memchr",
  "serde",
