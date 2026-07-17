@@ -2207,7 +2207,8 @@ dependencies = [
 [[package]]
 name = "jsonfg"
 version = "0.1.0"
-source = "git+https://github.com/360-geo/jsonfg?rev=82126d83268950121837aeae8dafc27e2f3d89d3#82126d83268950121837aeae8dafc27e2f3d89d3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "89d6197bc43b86402e9a505b458e9865e6642a2f90a32855ceeb08a1e44e1d9e"
 dependencies = [
  "geojson",
  "serde",
