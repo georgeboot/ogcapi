@@ -185,8 +185,10 @@ mod tests {
     #[cfg(any(feature = "records", feature = "stac", feature = "edr"))]
     #[test]
     fn keywords_roundtrip() {
-        let collection: Collection =
-            serde_json::from_str(r#"{"id": "test", "keywords": ["a", "b"]}"#).unwrap();
+        let collection: Collection = serde_json::from_str(
+            r#"{"id": "test", "keywords": ["a", "b"], "license": "proprietary"}"#,
+        )
+        .unwrap();
         assert_eq!(collection.keywords, vec!["a", "b"]);
         let json = serde_json::to_value(&collection).unwrap();
         assert_eq!(json["keywords"], serde_json::json!(["a", "b"]));
