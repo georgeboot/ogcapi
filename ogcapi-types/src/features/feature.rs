@@ -1,5 +1,5 @@
 #[cfg(feature = "stac")]
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::Display;
 
 #[cfg(feature = "stac")]
@@ -95,8 +95,12 @@ pub struct Feature {
     )]
     #[schema(value_type = Object)]
     pub coord_ref_sys: Option<jsonfg::CoordRefSys>,
-    /// The geometry in a non-WGS84 CRS (JSON-FG), which may use solids or curves. When
-    /// set, the GeoJSON `geometry` member is `null`.
+    /// The geometry in a non-WGS84 CRS (JSON-FG), which may use solids or curves.
+    ///
+    /// `coordRefSys` describes this member and says nothing about `geometry`, so
+    /// the two coexist: `geometry` may hold a WGS 84 representation for GeoJSON
+    /// readers, or be `null`. See
+    /// [`into_json_fg_with_geometry`](Feature::into_json_fg_with_geometry).
     #[cfg(feature = "json-fg")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Object)]
@@ -117,18 +121,27 @@ pub struct Feature {
     pub bbox: Option<Bbox>,
     #[serde(default)]
     pub links: Vec<Link>,
-    /// The STAC version the Item implements.
+    /// The STAC version the Item implements, when it is one.
+    ///
+    /// Optional, and omitted when `None`, because the `stac` feature is
+    /// enabled crate-wide: a server may serve STAC Items from some collections
+    /// and plain OGC API Features from others, and the latter must not sprout
+    /// a `stac_version` that claims otherwise.
     #[cfg(feature = "stac")]
-    #[serde(default = "crate::stac::stac_version")]
-    pub stac_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stac_version: Option<String>,
     /// A list of extensions the Item implements.
     #[cfg(feature = "stac")]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stac_extensions: Vec<String>,
     /// Dictionary of asset objects that can be downloaded, each with a unique key.
+    ///
+    /// Ordered, so one item always serialises to the same bytes. A server that
+    /// caches rendered responses, or snapshots them in tests, cannot use a
+    /// hash map here.
     #[cfg(feature = "stac")]
-    #[serde(default)]
-    pub assets: HashMap<String, crate::stac::Asset>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub assets: BTreeMap<String, crate::stac::Asset>,
     #[cfg(feature = "movingfeatures")]
     #[serde(
         default,
@@ -185,7 +198,7 @@ impl Feature {
             bbox: Default::default(),
             links: Default::default(),
             #[cfg(feature = "stac")]
-            stac_version: crate::stac::stac_version(),
+            stac_version: None,
             #[cfg(feature = "stac")]
             stac_extensions: Default::default(),
             #[cfg(feature = "stac")]
@@ -232,7 +245,7 @@ impl Default for Feature {
             bbox: None,
             links: Vec::new(),
             #[cfg(feature = "stac")]
-            stac_version: crate::stac::stac_version(),
+            stac_version: None,
             #[cfg(feature = "stac")]
             stac_extensions: Vec::new(),
             #[cfg(feature = "stac")]
@@ -268,19 +281,47 @@ impl Feature {
         self.into_json_fg_scoped(&crs, true)
     }
 
+    /// As [`into_json_fg`](Feature::into_json_fg), but keeping a WGS 84 geometry
+    /// in `geometry` beside the native one in `place`.
+    ///
+    /// JSON-FG's `coordRefSys` describes `place` and says nothing about
+    /// `geometry`, so a document may carry both: the native coordinates for a
+    /// JSON-FG reader, and a WGS 84 representation for every GeoJSON reader
+    /// that would otherwise see `null`. That is what makes a JSON-FG document
+    /// simultaneously a valid GeoJSON Feature, and so a valid STAC Item.
+    ///
+    /// `wgs84` is not derived here — this crate does not reproject. Pass the
+    /// already-transformed geometry, or `None` to get the `geometry: null`
+    /// shape of [`into_json_fg`](Feature::into_json_fg).
+    pub fn into_json_fg_with_geometry(
+        self,
+        crs: jsonfg::CoordRefSys,
+        wgs84: Option<Geometry>,
+    ) -> Self {
+        self.into_json_fg_scoped_with(&crs, true, Some(wgs84))
+    }
+
     /// As [`into_json_fg`](Feature::into_json_fg); `top_level` gates the feature-level
     /// `conformsTo`/`coordRefSys` (omitted for features nested in a collection).
-    pub(crate) fn into_json_fg_scoped(
+    pub(crate) fn into_json_fg_scoped(self, crs: &jsonfg::CoordRefSys, top_level: bool) -> Self {
+        self.into_json_fg_scoped_with(crs, top_level, None)
+    }
+
+    /// The shared body. `wgs84` of `None` means "null the geometry" (the
+    /// original behaviour); `Some(g)` means "put `g` in `geometry`", including
+    /// `Some(None)` for an explicit null.
+    pub(crate) fn into_json_fg_scoped_with(
         mut self,
         crs: &jsonfg::CoordRefSys,
         top_level: bool,
+        wgs84: Option<Option<Geometry>>,
     ) -> Self {
         let geometry = self.geometry.take();
         if crs.is_wgs84() {
             self.geometry = geometry;
         } else {
             self.place = geometry.map(jsonfg::Geometry::from);
-            self.geometry = None;
+            self.geometry = wgs84.unwrap_or(None);
             if top_level {
                 self.coord_ref_sys = Some(crs.clone());
             }

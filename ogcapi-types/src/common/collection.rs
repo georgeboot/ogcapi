@@ -86,8 +86,13 @@ pub struct Collection {
     pub summaries: Map<String, Value>,
     /// Dictionary of asset objects that can be downloaded, each with a unique key.
     #[cfg(feature = "stac")]
-    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
-    pub assets: std::collections::HashMap<String, crate::stac::Asset>,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub assets: std::collections::BTreeMap<String, crate::stac::Asset>,
+    /// What the assets of this collection's items look like, so a client knows
+    /// which keys to expect before it fetches one. STAC 1.1 core.
+    #[cfg(feature = "stac")]
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub item_assets: Map<String, Value>,
     #[cfg(feature = "movingfeatures")]
     #[serde(
         default,
@@ -144,6 +149,8 @@ impl Default for Collection {
             summaries: Default::default(),
             #[cfg(feature = "stac")]
             assets: Default::default(),
+            #[cfg(feature = "stac")]
+            item_assets: Default::default(),
             #[cfg(feature = "movingfeatures")]
             update_frequency: Default::default(),
             additional_properties: Default::default(),

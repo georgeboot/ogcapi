@@ -35,6 +35,31 @@ pub struct Link {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub length: Option<i64>,
+    /// The HTTP method to use when following this link, when it is not `GET`.
+    ///
+    /// Added by STAC API - Item Search, which pages a `POST /search` with a
+    /// `next` link. A URL alone cannot express that continuation, because the
+    /// filters live in the request body.
+    #[cfg(feature = "stac")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub method: Option<String>,
+    /// Headers to send when following this link.
+    #[cfg(feature = "stac")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub headers: Option<serde_json::Map<String, serde_json::Value>>,
+    /// Body to send when following this link with a method that takes one.
+    #[cfg(feature = "stac")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub body: Option<serde_json::Map<String, serde_json::Value>>,
+    /// Whether [`body`](Link::body) extends the original request body rather
+    /// than replacing it. A paging link carries only the token, so it merges.
+    #[cfg(feature = "stac")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub merge: Option<bool>,
 }
 
 impl Link {
@@ -49,7 +74,31 @@ impl Link {
             hreflang: None,
             title: None,
             length: None,
+            #[cfg(feature = "stac")]
+            method: None,
+            #[cfg(feature = "stac")]
+            headers: None,
+            #[cfg(feature = "stac")]
+            body: None,
+            #[cfg(feature = "stac")]
+            merge: None,
         }
+    }
+
+    /// Sets the HTTP method to use when following this link.
+    #[cfg(feature = "stac")]
+    pub fn method(mut self, method: impl ToString) -> Link {
+        self.method = Some(method.to_string());
+        self
+    }
+
+    /// Sets a body to merge into the original request when following this
+    /// link, as a `POST` paging link does.
+    #[cfg(feature = "stac")]
+    pub fn merge_body(mut self, body: serde_json::Map<String, serde_json::Value>) -> Link {
+        self.body = Some(body);
+        self.merge = Some(true);
+        self
     }
 
     /// Sets the media type of the Link and returns the Value

@@ -9,6 +9,9 @@ use crate::common::Bbox;
 
 use super::Feature;
 
+#[cfg(feature = "json-fg")]
+use geojson::Geometry;
+
 #[derive(Serialize, Deserialize, ToSchema, Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Type {
     #[default]
@@ -99,6 +102,36 @@ impl FeatureCollection {
             .features
             .into_iter()
             .map(|f| f.into_json_fg_scoped(&crs, false))
+            .collect();
+        self
+    }
+
+    /// As [`into_json_fg`](FeatureCollection::into_json_fg), but keeping a WGS 84
+    /// geometry in each feature's `geometry` beside the native one in `place`.
+    ///
+    /// `wgs84` is called with each feature while its native geometry is still in
+    /// `geometry`, and returns the WGS 84 replacement. This crate does not
+    /// reproject; the caller supplies the transformed geometry.
+    ///
+    /// Carrying both is what lets one document serve a JSON-FG reader and a
+    /// plain GeoJSON reader at once, and is what makes a JSON-FG feature
+    /// collection a valid GeoJSON one.
+    pub fn into_json_fg_with(
+        mut self,
+        crs: jsonfg::CoordRefSys,
+        mut wgs84: impl FnMut(&Feature) -> Option<Geometry>,
+    ) -> Self {
+        self.conforms_to = Some(vec![jsonfg::conformance::CORE.to_owned()]);
+        if !crs.is_wgs84() {
+            self.coord_ref_sys = Some(crs.clone());
+        }
+        self.features = self
+            .features
+            .into_iter()
+            .map(|f| {
+                let geometry = wgs84(&f);
+                f.into_json_fg_scoped_with(&crs, false, Some(geometry))
+            })
             .collect();
         self
     }
