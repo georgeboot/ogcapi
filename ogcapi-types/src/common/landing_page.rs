@@ -15,21 +15,27 @@ use super::Link;
 /// * the Collections (path `/collections`, link relation `data`).
 #[derive(Serialize, Deserialize, ToSchema, Debug, PartialEq, Eq, Clone)]
 pub struct LandingPage {
-    /// Set to `Catalog` if this Catalog only implements the Catalog spec.
+    /// `Catalog`, when this landing page is also a STAC Catalog.
+    ///
+    /// Optional, and omitted when absent, for the same reason as
+    /// [`Feature::stac_version`](crate::features::Feature): the `stac` feature
+    /// is crate-wide, so a landing page that serves only OGC API Features must
+    /// not announce itself as a STAC Catalog.
     #[cfg(feature = "stac")]
-    #[serde(default = "crate::stac::catalog")]
-    pub r#type: String,
-    /// The STAC version the Catalog implements.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
+    /// The STAC version the Catalog implements, when it is one.
     #[cfg(feature = "stac")]
-    #[serde(default = "crate::stac::stac_version")]
-    pub stac_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stac_version: Option<String>,
     /// A list of extension identifiers the Catalog implements.
     #[cfg(feature = "stac")]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stac_extensions: Vec<String>,
-    /// Identifier for the Catalog.
+    /// Identifier for the Catalog, required of a STAC one.
     #[cfg(feature = "stac")]
-    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     /// The title of the API.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -63,9 +69,9 @@ impl Default for LandingPage {
     fn default() -> Self {
         Self {
             #[cfg(feature = "stac")]
-            r#type: crate::stac::catalog(),
+            r#type: None,
             #[cfg(feature = "stac")]
-            stac_version: crate::stac::stac_version(),
+            stac_version: None,
             #[cfg(feature = "stac")]
             stac_extensions: Default::default(),
             #[cfg(feature = "stac")]
@@ -97,7 +103,17 @@ impl LandingPage {
 
     #[cfg(feature = "stac")]
     pub fn id(mut self, id: impl ToString) -> Self {
-        self.id = id.to_string();
+        self.id = Some(id.to_string());
+        self
+    }
+
+    /// Make this landing page a STAC Catalog: `type`, `stac_version` and the
+    /// conformance classes a STAC client reads from it.
+    #[cfg(feature = "stac")]
+    pub fn as_stac_catalog(mut self, id: impl ToString) -> Self {
+        self.r#type = Some(crate::stac::catalog());
+        self.stac_version = Some(crate::stac::stac_version());
+        self.id = Some(id.to_string());
         self
     }
 
