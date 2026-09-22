@@ -155,7 +155,7 @@ async fn read(
     }
 
     #[cfg(feature = "stac")]
-    if collection.r#type == "Collection" {
+    if collection.r#type.as_deref() == Some("Collection") {
         let items_url = url.join(&format!("{}/items", collection.id))?;
         let items_link = Link::new(items_url, ITEMS).mediatype(GEO_JSON);
         collection.links.insert_or_update(&[items_link]);

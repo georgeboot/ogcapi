@@ -11,10 +11,16 @@ use super::{Crs, Extent, Link};
 #[serde(rename_all = "camelCase")]
 pub struct Collection {
     pub id: String,
-    /// Must be set to `Collection` to be a valid Collection.
+    /// `Collection` for a STAC Collection; absent otherwise.
+    ///
+    /// Optional for the same reason as
+    /// [`Feature::stac_version`](crate::features::Feature): the `stac` feature
+    /// is crate-wide, so enabling it must not make every OGC API Features
+    /// collection announce itself as a STAC one. Set it, with `stac_version`
+    /// and `license`, through [`Collection::as_stac_collection`].
     #[cfg(feature = "stac")]
-    #[serde(default = "collection")]
-    pub r#type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -60,10 +66,14 @@ pub struct Collection {
         skip_serializing_if = "std::collections::HashMap::is_empty"
     )]
     pub parameter_names: std::collections::HashMap<String, crate::edr::ParameterNames>,
-    /// The STAC version the Collection implements.
+    /// The STAC version the Collection implements, when it is one.
     #[cfg(feature = "stac")]
-    #[serde(default = "crate::stac::stac_version", rename = "stac_version")]
-    pub stac_version: String,
+    #[serde(
+        default,
+        rename = "stac_version",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub stac_version: Option<String>,
     // /// A list of extension identifiers the Collection implements.
     #[cfg(feature = "stac")]
     #[serde(
@@ -73,9 +83,11 @@ pub struct Collection {
     )]
     pub stac_extensions: Vec<String>,
     /// Collection's license(s), either a SPDX License identifier, `various` if
-    /// multiple licenses apply or `proprietary` for all other cases.
+    /// multiple licenses apply or `proprietary` for all other cases. Required
+    /// of a STAC Collection, absent otherwise.
     #[cfg(feature = "stac")]
-    pub license: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
     /// A list of providers, which may include all organizations capturing or processing the data or the hosting provider.
     #[cfg(feature = "stac")]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -89,9 +101,11 @@ pub struct Collection {
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub assets: std::collections::BTreeMap<String, crate::stac::Asset>,
     /// What the assets of this collection's items look like, so a client knows
-    /// which keys to expect before it fetches one. STAC 1.1 core.
+    /// which keys to expect before it fetches one. STAC 1.1 core. Snake case
+    /// on the wire, like every other STAC member, despite the struct-wide
+    /// camelCase that OGC API naming needs.
     #[cfg(feature = "stac")]
-    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    #[serde(default, rename = "item_assets", skip_serializing_if = "Map::is_empty")]
     pub item_assets: Map<String, Value>,
     #[cfg(feature = "movingfeatures")]
     #[serde(
@@ -109,17 +123,12 @@ fn feature() -> String {
     "feature".to_string()
 }
 
-#[cfg(feature = "stac")]
-fn collection() -> String {
-    "Collection".to_string()
-}
-
 #[allow(clippy::derivable_impls)]
 impl Default for Collection {
     fn default() -> Self {
         Self {
             #[cfg(feature = "stac")]
-            r#type: "Collection".to_string(),
+            r#type: None,
             id: Default::default(),
             title: Default::default(),
             description: Default::default(),
@@ -138,11 +147,11 @@ impl Default for Collection {
             #[cfg(feature = "edr")]
             parameter_names: Default::default(),
             #[cfg(feature = "stac")]
-            stac_version: crate::stac::stac_version(),
+            stac_version: None,
             #[cfg(feature = "stac")]
             stac_extensions: Default::default(),
             #[cfg(feature = "stac")]
-            license: "various".to_string(),
+            license: None,
             #[cfg(feature = "stac")]
             providers: Default::default(),
             #[cfg(feature = "stac")]
@@ -155,5 +164,18 @@ impl Default for Collection {
             update_frequency: Default::default(),
             additional_properties: Default::default(),
         }
+    }
+}
+
+#[cfg(feature = "stac")]
+impl Collection {
+    /// Make this collection a STAC Collection: `type`, `stac_version` and the
+    /// `license` STAC requires, which only belong together on one that really
+    /// is one.
+    pub fn as_stac_collection(mut self, license: impl ToString) -> Self {
+        self.r#type = Some("Collection".to_string());
+        self.stac_version = Some(crate::stac::stac_version());
+        self.license = Some(license.to_string());
+        self
     }
 }
